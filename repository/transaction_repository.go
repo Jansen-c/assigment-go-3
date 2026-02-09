@@ -68,7 +68,6 @@ func (repo *TransactionRepository) CreateTransaction(items []models.CheckoutItem
 		return nil, err
 	}
 
-	//* Task 3 no. 1: change from details[i].ProductID to detail.ProductID
 	// for i := range details {
 	// 	details[i].TransactionID = transactionID
 	// 	_, err = tx.Exec("INSERT INTO transaction_details (transaction_id, product_id, quantity, subtotal) VALUES ($1, $2, $3, $4)",
@@ -78,11 +77,27 @@ func (repo *TransactionRepository) CreateTransaction(items []models.CheckoutItem
 	// 	}
 	// }
 
-	// Insert transaction details
-	for i, detail := range details {
-		details[i].TransactionID = transactionID
-		_, err := tx.Exec("INSERT INTO transaction_details (transaction_id, product_id, quantity, subtotal) VALUES ($1, $2,$3,$4)", transactionID, detail.ProductID, detail.Quantity, detail.Subtotal)
-		if err != nil {
+	//* Task 3 no. 1: Refactor this, instead of exec per loop. Create loop, then append everything into arr, finally insert all at once as exec.
+	// Insert transaction details. commented below is deprecated.
+	// for i, detail := range details {
+	// 	details[i].TransactionID = transactionID
+	// 	_, err := tx.Exec("INSERT INTO transaction_details (transaction_id, product_id, quantity, subtotal) VALUES ($1, $2,$3,$4)", transactionID, detail.ProductID, detail.Quantity, detail.Subtotal)
+	// 	if err != nil {
+	if len(details) > 0 {
+		query := "INSERT INTO transaction_details (transaction_id, product_id, quantity, subtotal) VALUES "
+		// args := make([]interface{}, 0, len(details)*4) // hard to read, use any with unlimited size like below first.
+		args := []any{}
+
+		for i, detail := range details {
+			details[i].TransactionID = transactionID
+			if i > 0 {
+				query += ","
+			}
+			query += fmt.Sprintf("($%d, $%d, $%d, $%d)", i*4+1, i*4+2, i*4+3, i*4+4)
+			args = append(args, transactionID, detail.ProductID, detail.Quantity, detail.Subtotal)
+		}
+
+		if _, err := tx.Exec(query, args...); err != nil {
 			return nil, err
 		}
 	}
